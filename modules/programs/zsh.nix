@@ -6,6 +6,8 @@ let
 
   cfg = config.programs.zsh;
 
+  zim = pkgs.callPackage ./zsh/default.nix {};
+
   relToDotDir = file: (optionalString (cfg.dotDir != null) (cfg.dotDir + "/")) + file;
 
   pluginsDir = if cfg.dotDir != null then
@@ -476,10 +478,10 @@ in
           fpath+="$HOME/${pluginsDir}/${plugin.name}"
         '') cfg.plugins)}
 
-        # Oh-My-Zsh/Prezto calls compinit during initialization,
+        # Oh-My-Zsh/Prezto/Zim calls compinit during initialization,
         # calling it twice causes slight start up slowdown
         # as all $fpath entries will be traversed again.
-        ${optionalString (cfg.enableCompletion && !cfg.oh-my-zsh.enable && !cfg.prezto.enable)
+        ${optionalString (cfg.enableCompletion && !cfg.oh-my-zsh.enable && !cfg.prezto.enable && !cfg.zimfw.enable)
           cfg.completionInit
         }
 
@@ -513,6 +515,8 @@ in
 
         ${optionalString cfg.prezto.enable
             (builtins.readFile "${pkgs.zsh-prezto}/share/zsh-prezto/runcoms/zshrc")}
+
+        ${optionalString cfg.zimfw.enable cfg.zimfw.zshrc}
 
         ${concatStrings (map (plugin: ''
           if [[ -f "$HOME/${pluginsDir}/${plugin.name}/${plugin.file}" ]]; then

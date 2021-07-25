@@ -146,6 +146,7 @@ let
     ./programs/zplug.nix
     ./programs/zsh.nix
     ./programs/zsh/prezto.nix
+    ./programs/zsh/zimfw.nix
     ./services/barrier.nix
     ./services/blueman-applet.nix
     ./services/caffeine.nix
