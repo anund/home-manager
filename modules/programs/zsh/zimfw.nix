@@ -53,13 +53,6 @@ let
   zimUpdate = file: ''
     echo ${file} changed updating zim modules
     $DRY_RUN_CMD export ZIM_HOME=${zimHome}
-    if [[ -f ${zHome}/${file}.zwc ]]; then
-        set +e # clean failing should not stop the enclosing activation script
-        # This is a dirty edge case. zimfw doesn't expect clean to be called on a partially installed modules folder
-        # partial modules can happen if, for example, users delete module folders manually
-        $DRY_RUN_CMD ${pkgs.zsh}/bin/zsh ${zimHome}/zimfw.zsh clean -q
-        set -e
-    fi
     $DRY_RUN_CMD ${pkgs.zsh}/bin/zsh ${zimHome}/zimfw.zsh install -q
     $DRY_RUN_CMD ${pkgs.zsh}/bin/zsh ${zimHome}/zimfw.zsh uninstall -q
     $DRY_RUN_CMD unset ZIM_HOME

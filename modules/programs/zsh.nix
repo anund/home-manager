@@ -444,12 +444,8 @@ in
       '';
     })
 
-    {
-      home.packages = with pkgs; [ zsh ]
-        ++ optional cfg.enableCompletion nix-zsh-completions
-        ++ optional cfg.oh-my-zsh.enable oh-my-zsh;
-
-      home.file."${relToDotDir ".zshrc"}".text = ''
+    (let
+    zshrc = pkgs.writeText "zshrc" ''
         ${cfg.initExtraFirst}
 
         typeset -U path cdpath fpath manpath
@@ -553,7 +549,21 @@ in
         # Named Directory Hashes
         ${dirHashesStr}
       '';
-    }
+    # note the file name passed to zcompile must match the value of home.file.<name>
+    zshrcCompiled = pkgs.runCommand "zshrc.zwc" {} ''
+        cp ${zshrc} .zshrc
+        ${pkgs.zsh}/bin/zsh -c "zcompile .zshrc"
+        cp .zshrc.zwc $out
+    '';
+    in
+    {
+      home.packages = with pkgs; [ zsh ]
+        ++ optional cfg.enableCompletion nix-zsh-completions
+        ++ optional cfg.oh-my-zsh.enable oh-my-zsh;
+
+      home.file."${relToDotDir ".zshrc"}".source = zshrc;
+      home.file."${relToDotDir ".zshrc.zwc"}".source = zshrcCompiled;
+    })
 
     (mkIf cfg.oh-my-zsh.enable {
       # Make sure we create a cache directory since some plugins expect it to exist
