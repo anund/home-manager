@@ -130,7 +130,7 @@ let
         description = ''
           The name of the plugin.
 
-          Don't forget to add <option>file</option>
+          Don''\'t forget to add <option>file</option>
           if the script name does not follow convention.
         '';
       };
@@ -272,7 +272,7 @@ in
       enableCompletion = mkOption {
         default = true;
         description = ''
-          Enable zsh completion. Don't forget to add
+          Enable zsh completion. Don''\'t forget to add
           <programlisting language="nix">
             environment.pathsToLink = [ "/share/zsh" ];
           </programlisting>
@@ -405,23 +405,28 @@ in
       };
     };
   };
-
-  config = mkIf cfg.enable (mkMerge [
-    (mkIf (cfg.envExtra != "") {
-      home.file."${relToDotDir ".zshenv"}".text = cfg.envExtra;
-    })
-
-    (mkIf (cfg.profileExtra != "") {
-      home.file."${relToDotDir ".zprofile"}".text = cfg.profileExtra;
-    })
-
-    (mkIf (cfg.loginExtra != "") {
-      home.file."${relToDotDir ".zlogin"}".text = cfg.loginExtra;
-    })
-
-    (mkIf (cfg.logoutExtra != "") {
-      home.file."${relToDotDir ".zlogout"}".text = cfg.logoutExtra;
-    })
+  config =
+  let
+    # note name must match the eventual filename on disk read at runtime
+    zCompile = name: text:
+    let
+      source = pkgs.writeText name text;
+      compiled = pkgs.runCommand "${name}.zwc" {} ''
+        cp ${source} ${name}
+        ${pkgs.zsh}/bin/zsh -c "zcompile ${name}"
+        cp ${name}.zwc $out
+      '';
+    in
+    {
+      home.file."${relToDotDir name}".source = source;
+      home.file."${relToDotDir "${name}.zwc"}".source = compiled;
+    };
+  in
+  mkIf cfg.enable (mkMerge [
+    (mkIf (cfg.loginExtra != "") (zCompile ".zshenv" cfg.envExtra))
+    (mkIf (cfg.loginExtra != "") (zCompile ".zprofile" cfg.profileExtra))
+    (mkIf (cfg.loginExtra != "") (zCompile ".zlogin" cfg.loginExtra))
+    (mkIf (cfg.loginExtra != "") (zCompile ".zlogout" cfg.logoutExtra))
 
     (mkIf cfg.oh-my-zsh.enable {
       home.file."${relToDotDir ".zshenv"}".text = ''
@@ -549,21 +554,15 @@ in
         # Named Directory Hashes
         ${dirHashesStr}
       '';
-    # note the file name passed to zcompile must match the value of home.file.<name>
-    zshrcCompiled = pkgs.runCommand "zshrc.zwc" {} ''
-        cp ${zshrc} .zshrc
-        ${pkgs.zsh}/bin/zsh -c "zcompile .zshrc"
-        cp .zshrc.zwc $out
-    '';
     in
+      (zCompile ".zshrc" zshrc)
+    )
+
     {
       home.packages = with pkgs; [ zsh ]
         ++ optional cfg.enableCompletion nix-zsh-completions
         ++ optional cfg.oh-my-zsh.enable oh-my-zsh;
-
-      home.file."${relToDotDir ".zshrc"}".source = zshrc;
-      home.file."${relToDotDir ".zshrc.zwc"}".source = zshrcCompiled;
-    })
+    }
 
     (mkIf cfg.oh-my-zsh.enable {
       # Make sure we create a cache directory since some plugins expect it to exist
