@@ -34,6 +34,22 @@ let
     vicmd = "bindkey -a";
   };
 
+  zCompile = name: text:
+  let
+    source = pkgs.writeText name text;
+    compiled = pkgs.runCommand "${name}.zwc" {} ''
+      cp ${source} ${name}
+      ${pkgs.zsh}/bin/zsh -c "zcompile ${name}"
+      cp ${name}.zwc $out
+    '';
+  in
+  mkMerge [{
+    home.file."${relToDotDir name}".source = source;
+  }
+  (mkIf (cfg.compile != false) {
+    home.file."${relToDotDir "${name}.zwc"}".source = compiled;
+  })];
+
   stateVersion = config.home.stateVersion;
 
   historyModule = types.submodule ({ config, ... }: {
@@ -209,6 +225,14 @@ in
           List of paths to autocomplete calls to `cd`.
         '';
         type = types.listOf types.str;
+      };
+
+      compile = mkOption {
+        default = false;
+        description = ''
+          Use zcompile to compile generated zsh configuration files.
+        '';
+        type = types.bool;
       };
 
       dotDir = mkOption {
@@ -405,49 +429,45 @@ in
   };
 
   config = mkIf cfg.enable (mkMerge [
-    (mkIf (cfg.envExtra != "") {
-      home.file."${relToDotDir ".zshenv"}".text = cfg.envExtra;
-    })
+    (mkIf (cfg.profileExtra != "") (zCompile ".zprofile" cfg.profileExtra))
+    (mkIf (cfg.loginExtra != "") (zCompile ".zlogin" cfg.loginExtra))
+    (mkIf (cfg.logoutExtra != "") (zCompile ".zlogout" cfg.logoutExtra))
 
-    (mkIf (cfg.profileExtra != "") {
-      home.file."${relToDotDir ".zprofile"}".text = cfg.profileExtra;
-    })
+    (let
+      # careful to keep the ''
+      zshenv = ''
+        ${optionalString (cfg.dotDir != null) "ZDOTDIR=${zdotdir}"}
 
-    (mkIf (cfg.loginExtra != "") {
-      home.file."${relToDotDir ".zlogin"}".text = cfg.loginExtra;
-    })
+        ${optionalString (cfg.oh-my-zsh.enable) ''
+          ZSH="${pkgs.oh-my-zsh}/share/oh-my-zsh";
+          ZSH_CACHE_DIR="${config.xdg.cacheHome}/oh-my-zsh";
+        ''}
 
-    (mkIf (cfg.logoutExtra != "") {
-      home.file."${relToDotDir ".zlogout"}".text = cfg.logoutExtra;
-    })
-
-    (mkIf cfg.oh-my-zsh.enable {
-      home.file."${relToDotDir ".zshenv"}".text = ''
-        ZSH="${pkgs.oh-my-zsh}/share/oh-my-zsh";
-        ZSH_CACHE_DIR="${config.xdg.cacheHome}/oh-my-zsh";
+        ${optionalString (cfg.envExtra != "") cfg.envExtra}
       '';
-    })
-
-    (mkIf (cfg.dotDir != null) {
-      home.file."${relToDotDir ".zshenv"}".text = ''
-        ZDOTDIR=${zdotdir}
-      '';
-
-      # When dotDir is set, only use ~/.zshenv to source ZDOTDIR/.zshenv,
-      # This is so that if ZDOTDIR happens to be
-      # already set correctly (by e.g. spawning a zsh inside a zsh), all env
-      # vars still get exported
-      home.file.".zshenv".text = ''
-        source ${zdotdir}/.zshenv
-      '';
-    })
+    in
+      (mkMerge [
+        (mkIf (cfg.dotDir != null) {
+          # When dotDir is set, only use ~/.zshenv to source ZDOTDIR/.zshenv,
+          # This is so that if ZDOTDIR happens to be
+          # already set correctly (by e.g. spawning a zsh inside a zsh), all env
+          # vars still get exported
+          home.file.".zshenv".text = ''
+            source ${zdotdir}/.zshenv
+          '';
+        })
+        (zCompile ".zshenv" zshenv)
+      ])
+    )
 
     {
       home.packages = with pkgs; [ zsh ]
         ++ optional cfg.enableCompletion nix-zsh-completions
         ++ optional cfg.oh-my-zsh.enable oh-my-zsh;
+    }
 
-      home.file."${relToDotDir ".zshrc"}".text = ''
+    (let
+      zshrc = ''
         ${cfg.initExtraFirst}
 
         typeset -U path cdpath fpath manpath
@@ -549,7 +569,9 @@ in
         # Named Directory Hashes
         ${dirHashesStr}
       '';
-    }
+    in
+      (zCompile ".zshrc" zshrc)
+    )
 
     (mkIf cfg.oh-my-zsh.enable {
       # Make sure we create a cache directory since some plugins expect it to exist
