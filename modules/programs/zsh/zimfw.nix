@@ -43,6 +43,8 @@ let
   zimHome = "${config.home.homeDirectory}/${relToDotDir ".zim"}";
   zHome = "${config.home.homeDirectory}/" +
     "${optionalString (config.programs.zsh.dotDir != null) (config.programs.zsh.dotDir + "/")}";
+  zDotDir = "${config.home.homeDirectory}" +
+    "${optionalString (config.programs.zsh.dotDir != null) ("/" + config.programs.zsh.dotDir)}";
 
   zimrc = zModule: ''
     # Auto generated
@@ -53,6 +55,7 @@ let
   zimUpdate = file: ''
     echo ${file} changed updating zim modules
     $DRY_RUN_CMD export ZIM_HOME=${zimHome}
+    $DRY_RUN_CMD export ZDOTDIR=${zDotDir}
     $DRY_RUN_CMD ${pkgs.zsh}/bin/zsh ${zimHome}/zimfw.zsh install -q
     $DRY_RUN_CMD ${pkgs.zsh}/bin/zsh ${zimHome}/zimfw.zsh uninstall -q
     $DRY_RUN_CMD unset ZIM_HOME
